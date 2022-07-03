@@ -27,9 +27,9 @@ class Code2VecPathStorage(
     }
 
     private fun storePathContext(pathContext: PathContext): PathContextId {
-        val startTokenId = pathContext.startToken.replace(",", "comma")
+        val startTokenId = pathContext.startToken.replace(" ", "space").replace(",", "comma")
         tokensMap.record(startTokenId)
-        val endTokenId = pathContext.endToken.replace(",", "comma")
+        val endTokenId = pathContext.endToken.replace(" ", "space").replace(",", "comma")
         tokensMap.record(endTokenId)
         val pathId = pathContext.orientedNodeTypes.sumOf { "${it.typeLabel} ${it.direction}".hashCode() }
         pathsMap.record(pathId)
