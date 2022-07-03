@@ -8,7 +8,7 @@ data class OrientedNodeType(val typeLabel: String, val direction: Direction)
 
 data class PathContext(val startToken: String, val orientedNodeTypes: List<OrientedNodeType>, val endToken: String)
 
-data class PathContextId(val startTokenId: Int, val pathId: Int, val endTokenId: Int)
+data class PathContextId(val startTokenId: String, val pathId: Int, val endTokenId: String)
 
 data class LabeledPathContexts<T>(val label: T, val pathContexts: Collection<PathContext>)
 

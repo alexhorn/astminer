@@ -10,7 +10,7 @@ class Code2VecPathStorage(
 ) :
     PathBasedStorage(outputDirectoryPath, config) {
 
-    private val tokensMap: RankedIncrementalIdStorage<Int> = RankedIncrementalIdStorage()
+    private val tokensMap: RankedIncrementalIdStorage<String> = RankedIncrementalIdStorage()
     private val pathsMap: RankedIncrementalIdStorage<Int> = RankedIncrementalIdStorage()
 
     private fun dumpPathContexts(labeledPathContextIds: LabeledPathContextIds<String>): String {
@@ -27,9 +27,9 @@ class Code2VecPathStorage(
     }
 
     private fun storePathContext(pathContext: PathContext): PathContextId {
-        val startTokenId = pathContext.startToken.hashCode()
+        val startTokenId = pathContext.startToken
         tokensMap.record(startTokenId)
-        val endTokenId = pathContext.endToken.hashCode()
+        val endTokenId = pathContext.endToken
         tokensMap.record(endTokenId)
         val pathId = pathContext.orientedNodeTypes.sumOf { "${it.typeLabel} ${it.direction}".hashCode() }
         pathsMap.record(pathId)
