@@ -10,16 +10,15 @@ class Code2VecPathStorage(
 ) :
     PathBasedStorage(outputDirectoryPath, config) {
 
-    private val tokensMap: RankedIncrementalIdStorage<String> = RankedIncrementalIdStorage()
-    private val orientedNodeTypesMap: RankedIncrementalIdStorage<OrientedNodeType> = RankedIncrementalIdStorage()
-    private val pathsMap: RankedIncrementalIdStorage<List<Long>> = RankedIncrementalIdStorage()
+    private val tokensMap: RankedIncrementalIdStorage<Int> = RankedIncrementalIdStorage()
+    private val pathsMap: RankedIncrementalIdStorage<Int> = RankedIncrementalIdStorage()
 
     private fun dumpPathContexts(labeledPathContextIds: LabeledPathContextIds<String>): String {
         val pathContextIdsString = labeledPathContextIds.pathContexts.filter {
             val isNumberOfTokensValid = config.maxTokens == null ||
-                tokensMap.getIdRank(it.startTokenId) <= config.maxTokens &&
-                tokensMap.getIdRank(it.endTokenId) <= config.maxTokens
-            val isNumberOfPathsValid = config.maxPaths == null || pathsMap.getIdRank(it.pathId) <= config.maxPaths
+                tokensMap.getKeyRank(it.startTokenId) <= config.maxTokens &&
+                tokensMap.getKeyRank(it.endTokenId) <= config.maxTokens
+            val isNumberOfPathsValid = config.maxPaths == null || pathsMap.getKeyRank(it.pathId) <= config.maxPaths
 
             isNumberOfTokensValid && isNumberOfPathsValid
         }
@@ -28,10 +27,12 @@ class Code2VecPathStorage(
     }
 
     private fun storePathContext(pathContext: PathContext): PathContextId {
-        val startTokenId = tokensMap.record(pathContext.startToken)
-        val endTokenId = tokensMap.record(pathContext.endToken)
-        val orientedNodesIds = pathContext.orientedNodeTypes.map { orientedNodeTypesMap.record(it) }
-        val pathId = pathsMap.record(orientedNodesIds)
+        val startTokenId = pathContext.startToken.hashCode()
+        tokensMap.record(startTokenId)
+        val endTokenId = pathContext.endToken.hashCode()
+        tokensMap.record(endTokenId)
+        val pathId = pathContext.orientedNodeTypes.sumOf { "${it.typeLabel} ${it.direction}".hashCode() }
+        pathsMap.record(pathId)
         return PathContextId(startTokenId, pathId, endTokenId)
     }
 
@@ -50,27 +51,4 @@ class Code2VecPathStorage(
         return "$label $joinedPathContexts"
     }
 
-    override fun close() {
-        super.close()
-        dumpIdStorageToCsv(
-            tokensMap,
-            "token",
-            tokenToCsvString,
-            File("$outputDirectoryPath/tokens.csv"),
-            config.maxTokens
-        )
-        dumpIdStorageToCsv(
-            orientedNodeTypesMap,
-            "node_type",
-            orientedNodeToCsvString,
-            File("$outputDirectoryPath/node_types.csv")
-        )
-        dumpIdStorageToCsv(
-            pathsMap,
-            "path",
-            pathToCsvString,
-            File("$outputDirectoryPath/paths.csv"),
-            config.maxPaths
-        )
-    }
 }
