@@ -3,8 +3,9 @@ package astminer.common.model
 import astminer.parse.ParsingException
 import mu.KotlinLogging
 import java.io.File
-import kotlin.concurrent.thread
-import kotlin.math.ceil
+import java.util.concurrent.Callable
+import java.util.concurrent.ExecutionException
+import java.util.concurrent.Executors
 
 private val logger = KotlinLogging.logger("HandlerFactory")
 
@@ -34,19 +35,20 @@ interface ParsingResultFactory {
         inputDirectoryPath: String? = null,
         action: (ParsingResult<out Node>) -> T
     ): List<T?> {
-        val results = mutableListOf<T?>()
-        val threads = mutableListOf<Thread>()
-
-        if (files.isEmpty()) { return emptyList() }
-
-        synchronized(results) {
-            files.chunked(ceil(files.size.toDouble() / numOfThreads).toInt()).filter { it.isNotEmpty() }
-                .map { chunk ->
-                    threads.add(thread { results.addAll(parseFiles(chunk, inputDirectoryPath, action)) })
+        val pool = Executors.newFixedThreadPool(numOfThreads)
+        try {
+            val futures = files.map { Callable { action(parse(it, inputDirectoryPath)) } }
+            return pool.invokeAll(futures).flatMap {
+                try {
+                    listOf(it.get())
+                } catch (e: Exception) {
+                    logger.error(e) { "Failed to parse file" }
+                    emptyList()
                 }
+            }
+        } finally {
+            pool.shutdown()
         }
-        threads.map { it.join() }
-        return results
     }
 }
 
