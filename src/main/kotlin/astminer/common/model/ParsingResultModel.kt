@@ -37,15 +37,15 @@ interface ParsingResultFactory {
     ): List<T?> {
         val pool = Executors.newFixedThreadPool(numOfThreads)
         try {
-            val futures = files.map { Callable { action(parse(it, inputDirectoryPath)) } }
-            return pool.invokeAll(futures).flatMap {
+            val futures = files.map { Callable<T?> {
                 try {
-                    listOf(it.get())
-                } catch (e: Exception) {
-                    logger.error(e) { "Failed to parse file" }
-                    emptyList()
+                    action(parse(it, inputDirectoryPath))
+                } catch (e: Error) {
+                    logger.error(e) { "Failed to parse file ${it.path}" }
+                    null
                 }
-            }
+            } }
+            return pool.invokeAll(futures).mapNotNull { it.get() }
         } finally {
             pool.shutdown()
         }
