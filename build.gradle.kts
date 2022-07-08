@@ -60,6 +60,8 @@ dependencies {
 
     // ==== Status bar ====
     implementation("me.tongfei:progressbar:0.9.2")
+
+    implementation("io.javalin:javalin:4.6.3")
 }
 
 val generatedSourcesPath = "src/main/generated"

@@ -1,46 +1,71 @@
 package astminer
 
-import astminer.common.model.FunctionInfoPropertyNotImplementedException
-import astminer.config.PipelineConfig
+import astminer.config.*
 import astminer.pipeline.Pipeline
-import astminer.pipeline.branch.IllegalFilterException
-import astminer.pipeline.branch.IllegalLabelExtractorException
 import com.charleskorn.kaml.PolymorphismStyle
 import com.charleskorn.kaml.Yaml
 import com.charleskorn.kaml.YamlConfiguration
 import com.github.ajalt.clikt.core.CliktCommand
-import com.github.ajalt.clikt.parameters.arguments.argument
-import com.github.ajalt.clikt.parameters.types.file
-import kotlinx.serialization.SerializationException
-import kotlinx.serialization.decodeFromString
+import io.javalin.Javalin
 import mu.KotlinLogging
-import java.io.File
+import kotlin.io.path.createTempDirectory
+import kotlin.io.path.readText
+import kotlin.io.path.writeText
+
 
 private val logger = KotlinLogging.logger("Main")
 
 class PipelineRunner : CliktCommand(name = "") {
-    val config: File by argument("config", help = "Path to config").file(
-        mustExist = true,
-        canBeDir = false,
-        mustBeReadable = true
-    )
 
     override fun run() {
-        try {
-            val config = yaml.decodeFromString<PipelineConfig>(config.readText())
-            Pipeline(config).run()
-        } catch (e: SerializationException) {
-            report("There was a problem in the config", e)
-        } catch (e: IllegalLabelExtractorException) {
-            report("PipelineBranch for given label extractor not found", e)
-        } catch (e: IllegalFilterException) {
-            report("The chosen filter is not implemented for the chosen granularity", e)
-        } catch (e: FunctionInfoPropertyNotImplementedException) {
-            report(
-                "The chosen parser does not implement the required properties. " +
-                    "Consider implementing them or change the parser",
-                e
-            )
+        val app = Javalin.create().start(7070)
+
+        app.post("/run") { ctx ->
+            try {
+                val contents = ctx.formParams("contents")!!
+                val lang = ctx.formParam("lang")!!
+                val label = ctx.formParam("label")!!
+
+                val inputDir = createTempDirectory()
+                val outputDir = createTempDirectory()
+
+                val ext = when (lang) {
+                    "java" -> FileExtension.Java
+                    "js" -> FileExtension.JavaScript
+                    "py" -> FileExtension.Python
+                    "php" -> FileExtension.PHP
+                    else -> throw IllegalArgumentException("Invalid language")
+                }
+
+                val config = PipelineConfig(
+                    inputDir = inputDir.toString(),
+                    outputDir = outputDir.toString(),
+                    parser = ParserConfig(ParserType.Antlr, listOf(ext)),
+                    labelExtractor = when (label) {
+                        "file name" -> FileNameExtractorConfig()
+                        "function name" -> FunctionNameExtractorConfig()
+                        else -> throw IllegalArgumentException("Illegal label")
+                    },
+                    storage = Code2VecPathStorageConfig(8, 2),
+                    numOfThreads = 1
+                )
+
+                contents.forEachIndexed { idx, content ->
+                    inputDir.resolve("input${idx}.${ext.fileExtension}").writeText(content)
+                }
+
+                Pipeline(config).run()
+
+                val result = outputDir.resolve("${lang}/data/path_contexts.c2s").readText()
+
+                ctx.result(result)
+
+                inputDir.toFile().deleteRecursively()
+                outputDir.toFile().deleteRecursively()
+            } catch (e: Exception) {
+                e.printStackTrace()
+                ctx.status(500).result(e.message ?: "")
+            }
         }
     }
 
