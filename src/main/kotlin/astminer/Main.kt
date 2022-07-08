@@ -9,6 +9,7 @@ import com.github.ajalt.clikt.core.CliktCommand
 import io.javalin.Javalin
 import mu.KotlinLogging
 import kotlin.io.path.createTempDirectory
+import kotlin.io.path.exists
 import kotlin.io.path.readText
 import kotlin.io.path.writeText
 
@@ -56,7 +57,8 @@ class PipelineRunner : CliktCommand(name = "") {
 
                 Pipeline(config).run()
 
-                val result = outputDir.resolve("${lang}/data/path_contexts.c2s").readText()
+                val resultFile = outputDir.resolve("${lang}/data/path_contexts.c2s")
+                val result = if (resultFile.exists()) { resultFile.readText() } else { "" }
 
                 ctx.result(result)
 
